@@ -11,7 +11,8 @@ import '../widgets/bouncy.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/mascot.dart';
 import '../widgets/sky_background.dart';
-import 'flow.dart';
+import 'level_list_screen.dart';
+import 'level_sheet.dart';
 
 const double _headerH = 128;
 const double _nodeGap = 92;
@@ -83,7 +84,10 @@ class _LevelMapScreenState extends State<LevelMapScreen> {
                     Expanded(child: Text('Adventure Map', style: kid(26, color: Colors.white, weight: FontWeight.w900))),
                     StatChip(emoji: '⭐', value: '${c.data.totalStars}'),
                     const SizedBox(width: 6),
-                    StatChip(emoji: '🪙', value: '${c.data.coins}'),
+                    RoundButton(
+                      icon: Icons.grid_view_rounded,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LevelListScreen())),
+                    ),
                   ],
                 ),
               ),
@@ -303,7 +307,7 @@ class _LevelNode extends StatelessWidget {
     final unlocked = c.progression.isLevelUnlocked(levelId, c.data);
     final stars = c.data.stars[levelId] ?? 0;
     final done = stars > 0;
-    final base = unlocked ? _diffColor(cfg.difficulty) : const Color(0xFFB9B3CC);
+    final base = unlocked ? _diffColor(cfg.tutorial ? cfg.difficulty : (c.difficultyPref ?? cfg.difficulty)) : const Color(0xFFB9B3CC);
 
     Widget node = Container(
       width: 62,
@@ -350,8 +354,7 @@ class _LevelNode extends StatelessWidget {
           showSnack(context, number == 1 ? 'Unlock this world first!' : 'Finish level ${number - 1} first!');
           return;
         }
-        c.audio.sfx(Sfx.tap);
-        openLevel(context, cfg);
+        showLevelSheet(context, cfg);
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,

@@ -10,7 +10,7 @@ import 'game_screen.dart';
 Future<void> openLevel(BuildContext context, LevelConfig cfg) async {
   final c = AppScope.read(context);
   final nav = Navigator.of(context);
-  await nav.push(fadeRoute<void>(GameScreen(config: cfg)));
+  await nav.push(fadeRoute<void>(GameScreen(config: c.applyDifficulty(cfg))));
   c.audio.playMusic('menu');
 }
 

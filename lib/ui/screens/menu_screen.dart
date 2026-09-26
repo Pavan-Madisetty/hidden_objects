@@ -10,9 +10,11 @@ import '../../state/game_controller.dart';
 import '../widgets/bouncy.dart';
 import '../widgets/mascot.dart';
 import '../widgets/sky_background.dart';
+import '../widgets/difficulty_picker.dart';
 import 'daily_screen.dart';
 import 'flow.dart';
 import 'leaderboard_screen.dart';
+import 'level_list_screen.dart';
 import 'level_map_screen.dart';
 import 'rewards_screen.dart';
 import 'settings_screen.dart';
@@ -60,7 +62,12 @@ class _MenuScreenState extends State<MenuScreen> {
         child: SkyBackground(
           palette: p,
           child: SafeArea(
-            child: Padding(
+            child: LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18),
               child: Column(
                 children: [
@@ -96,7 +103,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   const SizedBox(height: 14),
                   Bouncy(
                     onTap: () => setState(() => _pulse++),
-                    child: Mascot(emoji: c.characterEmoji, hat: c.hatEmoji, size: 104, pulse: _pulse),
+                    child: Mascot(emoji: c.characterEmoji, hat: c.hatEmoji, size: 88, pulse: _pulse),
                   ),
                   const Spacer(flex: 2),
                   if (first)
@@ -123,20 +130,36 @@ class _MenuScreenState extends State<MenuScreen> {
                         if (cont != null) openLevel(context, cont);
                       },
                     ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+                    decoration: BoxDecoration(color: alpha(Colors.white, 0.9), borderRadius: BorderRadius.circular(20)),
+                    child: DifficultyPicker(controller: c, showHint: false),
+                  ),
+                  const SizedBox(height: 10),
                   _dailyCard(c, p.secondary),
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      Expanded(child: _tile('🗺️', 'Play Map', p.secondary, () => _go(const LevelMapScreen()))),
+                      Expanded(child: _tile('📋', 'All Levels', p.secondary, () => _go(const LevelListScreen()))),
+                      const SizedBox(width: 10),
+                      Expanded(child: _tile('🗺️', 'Adventure Map', p.secondary, () => _go(const LevelMapScreen()))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: _tile('🏆', 'Leaderboard', const Color(0xFF6C8CFF), () => _go(const LeaderboardScreen()))),
                       const SizedBox(width: 10),
                       Expanded(child: _tile('🎁', 'Rewards', const Color(0xFFFF6FB5), () => _go(const RewardsScreen()))),
-                      const SizedBox(width: 10),
-                      Expanded(child: _tile('🏆', 'Ranks', const Color(0xFF6C8CFF), () => _go(const LeaderboardScreen()))),
                     ],
                   ),
                   const SizedBox(height: 16),
                 ],
+              ),
+            ),
+                  ),
+                ),
               ),
             ),
           ),

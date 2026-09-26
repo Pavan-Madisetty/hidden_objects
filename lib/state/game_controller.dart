@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/utils.dart';
 import '../data/audio_catalog.dart';
+import '../data/level_generator.dart';
 import '../data/level_repository.dart';
 import '../data/shop_catalog.dart';
 import '../data/worlds/worlds.dart';
@@ -358,7 +359,34 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
     final next = levels.next(cfg.id);
     if (next == null) return null;
     if (!progression.isLevelUnlocked(next.id, data)) return null;
-    return next;
+    return applyDifficulty(next);
+  }
+
+  // ---- difficulty choice ---------------------------------------------------------
+
+  /// null = "Auto": every level uses its built-in difficulty.
+  Difficulty? get difficultyPref {
+    switch (data.difficultyPref) {
+      case 'easy':
+        return Difficulty.easy;
+      case 'medium':
+        return Difficulty.medium;
+      case 'hard':
+        return Difficulty.hard;
+    }
+    return null;
+  }
+
+  void setDifficultyPref(Difficulty? d) {
+    data.difficultyPref = d == null ? 'auto' : d.name;
+    _changed();
+  }
+
+  /// The level as it will be played with the chosen difficulty applied.
+  LevelConfig applyDifficulty(LevelConfig cfg, {Difficulty? override}) {
+    final want = override ?? difficultyPref;
+    if (want == null) return cfg;
+    return const LevelGenerator().withDifficulty(registry.byId(cfg.worldId), cfg, want);
   }
 
   // ---- hints -----------------------------------------------------------------

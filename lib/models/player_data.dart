@@ -50,6 +50,9 @@ class PlayerData {
   int totalHints = 0;
   int sessions = 0;
   int lastLevel = 1;
+
+  /// Chosen difficulty: 'auto' (level default), 'easy', 'medium' or 'hard'.
+  String difficultyPref = 'auto';
   int levelsSinceAd = 0;
   int lastAdMs = 0;
   Map<String, int> bonusBest = {};
@@ -89,6 +92,7 @@ class PlayerData {
         'totalHints': totalHints,
         'sessions': sessions,
         'lastLevel': lastLevel,
+        'difficultyPref': difficultyPref,
         'levelsSinceAd': levelsSinceAd,
         'lastAdMs': lastAdMs,
         'bonusBest': bonusBest,
@@ -145,6 +149,7 @@ class PlayerData {
     d.totalHints = i('totalHints', 0);
     d.sessions = i('sessions', 0);
     d.lastLevel = i('lastLevel', 1);
+    d.difficultyPref = s('difficultyPref', 'auto');
     d.levelsSinceAd = i('levelsSinceAd', 0);
     d.lastAdMs = i('lastAdMs', 0);
     final bb = j['bonusBest'];

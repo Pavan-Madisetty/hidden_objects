@@ -338,6 +338,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Clear, one-step way out of a level: asks first so a stray tap can't
+  /// throw away progress. "Keep playing" is the big safe button.
+  Future<void> _confirmExit() async {
+    if (_outcome != null || _leaving) return;
+    final wasPaused = _paused;
+    _pause(silent: true);
+    final keep = await confirmDialog(
+      context,
+      emoji: '🚪',
+      title: 'Leave this level?',
+      message: 'You found ${_s.targetsFound} of ${_s.targetsTotal}. If you leave now, this level starts from the beginning next time.',
+      yes: 'Keep playing',
+      no: 'Exit level',
+    );
+    if (!mounted) return;
+    if (keep) {
+      if (!wasPaused) {
+        _resume();
+      } else {
+        setState(() => _paused = true);
+      }
+    } else {
+      await _exit();
+    }
+  }
+
   void _restart() {
     _c.levelQuit(_s);
     Navigator.of(context).pushReplacement(fadeRoute(GameScreen(config: widget.config)));
@@ -377,7 +403,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         } else if (_paused) {
           _resume();
         } else {
-          _pause();
+          _confirmExit();
         }
       },
       child: Scaffold(
@@ -428,7 +454,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         animation: _c,
         builder: (context, _) => Row(
           children: [
-            RoundButton(icon: Icons.pause_rounded, onTap: _pause),
+            RoundButton(
+              icon: Icons.close_rounded,
+              color: const Color(0xFFFF6B6B),
+              iconColor: Colors.white,
+              size: 42,
+              onTap: _confirmExit,
+            ),
+            const SizedBox(width: 6),
+            RoundButton(icon: Icons.pause_rounded, size: 42, onTap: _pause),
             const SizedBox(width: 10),
             Expanded(
               child: AnimatedBuilder(
@@ -465,8 +499,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 8),
             _timerChip(),
-            const SizedBox(width: 6),
-            StatChip(emoji: '🪙', value: '${_c.data.coins}'),
             const SizedBox(width: 8),
             _hintButton(),
           ],
@@ -758,7 +790,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             const SizedBox(height: 10),
             PillButton(label: 'Start again', emoji: '🔁', compact: true, width: double.infinity, color: const Color(0xFF6C8CFF), onTap: _restart),
             const SizedBox(height: 10),
-            PillButton(label: 'Back to map', emoji: '🗺️', compact: true, width: double.infinity, color: const Color(0xFFB0A8C9), onTap: _exit),
+            PillButton(label: 'Exit level', emoji: '🚪', compact: true, width: double.infinity, color: const Color(0xFFFF6B6B), onTap: _confirmExit),
             const SizedBox(height: 12),
             AnimatedBuilder(
               animation: _c,
@@ -800,7 +832,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             const SizedBox(height: 10),
             PillButton(label: '+30 seconds (video)', emoji: '🎬', compact: true, width: double.infinity, color: const Color(0xFF6C8CFF), onTap: _addTime),
             const SizedBox(height: 10),
-            PillButton(label: 'Back to map', emoji: '🗺️', compact: true, width: double.infinity, color: const Color(0xFFB0A8C9), onTap: _exit),
+            PillButton(label: 'Exit level', emoji: '🚪', compact: true, width: double.infinity, color: const Color(0xFFFF6B6B), onTap: _exit),
           ],
         ),
       ),

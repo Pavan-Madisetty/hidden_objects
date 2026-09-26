@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hidden_objects/data/level_generator.dart';
 import 'package:hidden_objects/data/level_repository.dart';
 import 'package:hidden_objects/data/worlds/worlds.dart';
 import 'package:hidden_objects/engine/level_session.dart';
@@ -88,6 +89,42 @@ void main() {
         check(s.layout.items.length >= n, 'level $id: layout has fewer items than targets');
       } catch (e) {
         problems.add('level $id: session build threw $e');
+      }
+    }
+    expect(problems, isEmpty, reason: problems.join('\n'));
+  });
+
+  test('every level can be played at Easy, Medium and Hard', () {
+    final problems = <String>[];
+    const gen = LevelGenerator();
+    for (var id = 1; id <= registry.totalLevels; id++) {
+      final base = repo.byId(id)!;
+      final world = registry.byId(base.worldId);
+      final byItem = {for (final i in world.items) i.id: i};
+      for (final d in Difficulty.values) {
+        final c = gen.withDifficulty(world, base, d);
+        final tag = 'level $id as ${d.name}';
+        if (c.tutorial) continue;
+        final n = c.targets.length;
+        final lo = d == Difficulty.easy ? 5 : (d == Difficulty.medium ? 7 : 10);
+        final hi = d == Difficulty.easy ? 7 : (d == Difficulty.medium ? 10 : 15);
+        if (n < lo || n > hi) problems.add('$tag has $n targets (want $lo-$hi)');
+        final all = c.sceneItemIds;
+        if (all.toSet().length != all.length) problems.add('$tag has duplicate items');
+        for (final t in all) {
+          final it = byItem[t];
+          if (it == null) {
+            problems.add('$tag unknown item $t');
+            continue;
+          }
+          if (it.hiddenIn != null && !c.activeProps.contains(it.hiddenIn)) {
+            problems.add('$tag: $t hidden in inactive prop ${it.hiddenIn}');
+          }
+        }
+        for (final e in c.locks.entries) {
+          if (!c.activeProps.contains(e.key)) problems.add('$tag: lock on inactive ${e.key}');
+          if (!all.contains(e.value)) problems.add('$tag: lock item ${e.value} absent');
+        }
       }
     }
     expect(problems, isEmpty, reason: problems.join('\n'));

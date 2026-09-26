@@ -179,7 +179,7 @@ class _LevelCompleteOverlayState extends State<LevelCompleteOverlay> {
                         if (widget.hasNext)
                           PillButton(label: 'Next level', emoji: '▶️', big: true, width: double.infinity, color: const Color(0xFF33C481), onTap: widget.onNext),
                         if (!widget.hasNext)
-                          PillButton(label: 'Back to map', emoji: '🗺️', big: true, width: double.infinity, color: const Color(0xFF33C481), onTap: widget.onMap),
+                          PillButton(label: 'Exit', emoji: '🚪', big: true, width: double.infinity, color: const Color(0xFF33C481), onTap: widget.onMap),
                         const SizedBox(height: 10),
                         Row(
                           children: [
@@ -191,7 +191,7 @@ class _LevelCompleteOverlayState extends State<LevelCompleteOverlay> {
                             ],
                             if (widget.hasNext)
                               Expanded(
-                                child: PillButton(label: 'Map', emoji: '🗺️', compact: true, color: const Color(0xFFB0A8C9), onTap: widget.onMap),
+                                child: PillButton(label: 'Exit', emoji: '🚪', compact: true, color: const Color(0xFFB0A8C9), onTap: widget.onMap),
                               ),
                           ],
                         ),

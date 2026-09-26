@@ -216,6 +216,35 @@ class LevelGenerator {
     );
   }
 
+  /// Rebuilds [base] at another difficulty tier (5-7 / 7-10 / 10-15 objects)
+  /// so players can pick Easy, Medium or Hard for any level. The tutorial,
+  /// daily and bonus levels are never changed.
+  LevelConfig withDifficulty(WorldDef world, LevelConfig base, Difficulty diff) {
+    if (base.tutorial || base.isDaily || base.isBonus || base.difficulty == diff) return base;
+    final n = base.id;
+    final count = switch (diff) {
+      Difficulty.easy => 5 + n % 3,
+      Difficulty.medium => 7 + n % 4,
+      Difficulty.hard => 10 + n % 6,
+    };
+    final size = switch (diff) {
+      Difficulty.easy => 1.15,
+      Difficulty.medium => 0.9,
+      Difficulty.hard => 0.7,
+    };
+    return generate(
+      world: world,
+      idx: base.indexInWorld,
+      levelId: base.id,
+      diff: diff,
+      count: count,
+      m: mechanicsFor(world.index, base.indexInWorld),
+      sizeMul: size,
+      title: base.title,
+      musicId: base.musicId,
+    );
+  }
+
   LevelConfig generate({
     required WorldDef world,
     required int idx,
