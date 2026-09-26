@@ -16,65 +16,81 @@ void main() {
   });
 
   test('every level is valid and solvable by construction', () {
+    final problems = <String>[];
+    void check(bool ok, String msg) {
+      if (!ok) problems.add(msg);
+    }
+
     for (var id = 1; id <= registry.totalLevels; id++) {
       final cfg = repo.byId(id);
-      expect(cfg, isNotNull, reason: 'level $id missing');
-      final c = cfg!;
+      if (cfg == null) {
+        problems.add('level $id missing');
+        continue;
+      }
+      final c = cfg;
       final world = registry.byId(c.worldId);
       final byItem = {for (final i in world.items) i.id: i};
       final propIds = {for (final p in world.props) p.id};
 
-      // Difficulty bands.
       final n = c.targets.length;
       switch (c.difficulty) {
         case Difficulty.easy:
-          expect(n, inInclusiveRange(5, 7), reason: 'level $id easy count');
+          check(n >= 5 && n <= 7, 'level $id easy has $n targets (want 5-7)');
           break;
         case Difficulty.medium:
-          expect(n, inInclusiveRange(7, 10), reason: 'level $id medium count');
+          check(n >= 7 && n <= 10, 'level $id medium has $n targets (want 7-10)');
           break;
         case Difficulty.hard:
-          expect(n, inInclusiveRange(10, 15), reason: 'level $id hard count');
+          check(n >= 10 && n <= 15, 'level $id hard has $n targets (want 10-15)');
           break;
       }
 
-      // Items exist, no duplicates.
       final all = c.sceneItemIds;
-      expect(all.toSet().length, all.length, reason: 'level $id duplicate items');
+      check(all.toSet().length == all.length, 'level $id has duplicate items');
+      var known = true;
       for (final t in all) {
-        expect(byItem.containsKey(t), isTrue, reason: 'level $id unknown item $t');
+        if (!byItem.containsKey(t)) {
+          known = false;
+          problems.add('level $id unknown item $t');
+        }
       }
+      if (!known) continue;
 
-      // Anything hidden inside a prop needs that prop to be interactive.
       for (final t in all) {
         final h = byItem[t]!.hiddenIn;
         if (h != null) {
-          expect(propIds.contains(h), isTrue, reason: 'level $id prop $h missing');
-          expect(c.activeProps.contains(h), isTrue, reason: 'level $id: $t hidden in inactive $h');
+          check(propIds.contains(h), 'level $id: prop $h missing for $t');
+          check(c.activeProps.contains(h), 'level $id: $t hidden in inactive prop $h');
         }
       }
 
-      // Locks: unlocking item exists and the dependency chain has no cycle.
       for (final e in c.locks.entries) {
-        expect(c.activeProps.contains(e.key), isTrue, reason: 'level $id lock on inactive ${e.key}');
-        expect(all.contains(e.value), isTrue, reason: 'level $id lock item ${e.value} absent');
+        check(c.activeProps.contains(e.key), 'level $id: lock on inactive prop ${e.key}');
+        check(all.contains(e.value), 'level $id: lock item ${e.value} absent from scene');
       }
       for (final start in c.locks.keys) {
         var prop = start;
         final seen = <String>{};
         while (c.locks.containsKey(prop)) {
-          expect(seen.add(prop), isTrue, reason: 'level $id lock cycle at $prop');
+          if (!seen.add(prop)) {
+            problems.add('level $id: lock cycle at $prop');
+            break;
+          }
           final need = c.locks[prop]!;
-          final inside = byItem[need]!.hiddenIn;
+          final inside = byItem[need]?.hiddenIn;
           if (inside == null) break;
           prop = inside;
         }
       }
 
-      // Scene builds and session can start.
-      final s = LevelSession(c, world);
-      expect(s.layout.items.length, greaterThanOrEqualTo(n), reason: 'level $id layout');
+      try {
+        final s = LevelSession(c, world);
+        check(s.layout.items.length >= n, 'level $id: layout has fewer items than targets');
+      } catch (e) {
+        problems.add('level $id: session build threw $e');
+      }
     }
+    expect(problems, isEmpty, reason: problems.join('\n'));
   });
 
   test('level 1 is the tutorial', () {

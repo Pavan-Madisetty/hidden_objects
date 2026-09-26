@@ -200,7 +200,9 @@ class LevelGenerator {
   LevelConfig standard(WorldDef world, int idx, int levelId) {
     final diff = difficultyForLevel(levelId);
     var count = objectCountForLevel(levelId);
-    if (idx == 0 && count > 5) count -= 1; // gentle start in each new world
+    // Gentle start in each new world, but never below the difficulty band.
+    final bandMin = diff == Difficulty.easy ? 5 : (diff == Difficulty.medium ? 7 : 10);
+    if (idx == 0 && count - 1 >= bandMin) count -= 1;
     final m = mechanicsFor(world.index, idx);
     return generate(
       world: world,
