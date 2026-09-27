@@ -13,6 +13,7 @@ import '../widgets/mascot.dart';
 import '../widgets/sky_background.dart';
 import 'level_list_screen.dart';
 import 'level_sheet.dart';
+import 'unlock_world.dart';
 
 const double _headerH = 128;
 const double _nodeGap = 92;
@@ -126,7 +127,7 @@ class _WorldSection extends StatelessWidget {
     return Column(
       children: [
         Bouncy(
-          onTap: unlocked ? null : () => _showRequirements(context),
+          onTap: unlocked ? null : () => offerWorldUnlock(context, world),
           child: Container(
             height: _headerH - 12,
             margin: const EdgeInsets.only(bottom: 12),
@@ -215,19 +216,6 @@ class _WorldSection extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-
-  void _showRequirements(BuildContext context) {
-    final c = controller;
-    final reqs = c.progression.missingRequirements(world, c.data);
-    c.audio.sfx(Sfx.wrong);
-    infoDialog(
-      context,
-      emoji: '🔒',
-      title: world.name,
-      message: 'To unlock this world:\n\n${reqs.map((r) => '• $r').join('\n')}',
-      ok: 'Got it',
     );
   }
 }

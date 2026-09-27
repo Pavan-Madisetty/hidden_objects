@@ -251,7 +251,7 @@ class SceneViewState extends State<SceneView> with SingleTickerProviderStateMixi
           children: [
             Positioned.fill(
               child: RepaintBoundary(
-                child: CustomPaint(painter: SceneBackdropPainter(widget.theme, room)),
+                child: CustomPaint(painter: SceneBackdropPainter(widget.theme, room, look: layout.look)),
               ),
             ),
             ...behindItems,

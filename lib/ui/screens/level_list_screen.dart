@@ -10,6 +10,7 @@ import '../widgets/difficulty_picker.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/sky_background.dart';
 import 'level_sheet.dart';
+import 'unlock_world.dart';
 
 const double _sectionH = 330;
 
@@ -99,7 +100,9 @@ class _WorldBlock extends StatelessWidget {
 
     return Column(
       children: [
-        Container(
+        Bouncy(
+          onTap: unlocked ? null : () => offerWorldUnlock(context, world),
+          child: Container(
           height: 76,
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -127,8 +130,15 @@ class _WorldBlock extends StatelessWidget {
                   ],
                 ),
               ),
+              if (!unlocked)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(color: alpha(Colors.white, 0.92), borderRadius: BorderRadius.circular(14)),
+                  child: Text('🔓 Unlock', style: kid(12, color: const Color(0xFF6C5CE7))),
+                ),
             ],
           ),
+        ),
         ),
         const SizedBox(height: 10),
         Expanded(
@@ -160,7 +170,11 @@ class _WorldBlock extends StatelessWidget {
         if (!unlocked) {
           c.audio.sfx(Sfx.wrong);
           final inWorld = c.progression.isWorldUnlocked(world, c.data);
-          showSnack(context, inWorld ? 'Finish level ${levelId - 1} first!' : 'Unlock this world first!');
+          if (inWorld) {
+            showSnack(context, 'Finish level ${levelId - 1} first!');
+          } else {
+            offerWorldUnlock(context, world);
+          }
           return;
         }
         showLevelSheet(context, cfg);

@@ -211,7 +211,12 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
 
   // ---- level lifecycle ---------------------------------------------------------
 
-  LevelSession createSession(LevelConfig cfg) => LevelSession(cfg, worldOf(cfg));
+  LevelSession createSession(LevelConfig cfg) {
+    // New arrangement every attempt, except where it must be reproducible
+    // (tutorial and the daily challenge, which is the same for everyone).
+    final salt = (cfg.tutorial || cfg.isDaily) ? 0 : (_clock().microsecondsSinceEpoch % 100000) + 1;
+    return LevelSession(cfg, worldOf(cfg), salt: salt);
+  }
 
   void levelStarted(LevelConfig cfg) {
     final replay = data.completed(cfg.id);
@@ -458,6 +463,28 @@ class GameController extends ChangeNotifier with WidgetsBindingObserver {
       _changed();
     }
     return ok;
+  }
+
+  // ---- unlock worlds by watching videos ---------------------------------------------
+
+  /// Worlds that would open when jumping ahead to [target].
+  List<WorldDef> worldsToUnlockFor(WorldDef target) => progression.lockedUpTo(target, data);
+
+  /// One video per skipped world.
+  int adsNeededFor(WorldDef target) => worldsToUnlockFor(target).length;
+
+  /// Plays one rewarded video and, if it was completed, opens the next closed
+  /// world on the way to [target]. Returns the world that was unlocked.
+  Future<WorldDef?> watchAdToUnlockWorld(WorldDef target) async {
+    final list = worldsToUnlockFor(target);
+    if (list.isEmpty) return null;
+    final ok = await _rewardedAd('unlock_world');
+    if (!ok) return null;
+    final w = list.first;
+    data.unlockedWorlds.add(w.id);
+    services.analytics.log(Ev.worldUnlocked, {'world': w.id, 'via': 'ad'});
+    _changed();
+    return w;
   }
 
   Future<bool> watchAdForTime() => _rewardedAd('extra_time');

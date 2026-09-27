@@ -3,6 +3,7 @@ import 'package:hidden_objects/data/level_generator.dart';
 import 'package:hidden_objects/data/level_repository.dart';
 import 'package:hidden_objects/data/worlds/worlds.dart';
 import 'package:hidden_objects/engine/level_session.dart';
+import 'package:hidden_objects/engine/scene_layout.dart';
 import 'package:hidden_objects/engine/progression.dart';
 import 'package:hidden_objects/models/player_data.dart';
 import 'package:hidden_objects/models/world_def.dart';
@@ -128,6 +129,71 @@ void main() {
       }
     }
     expect(problems, isEmpty, reason: problems.join('\n'));
+  });
+
+  test('scenes are varied: positions change per level and per difficulty', () {
+    const gen = LevelGenerator();
+    final world = registry.worlds.first;
+    final first = registry.firstLevelId(world);
+    // Same item, different levels -> different positions.
+    final seen = <String>{};
+    for (var i = 1; i < world.levelCount; i++) {
+      final cfg = repo.byId(first + i)!;
+      final id = cfg.targets.firstWhere((t) => world.itemById(t)?.hiddenIn == null && !(world.itemById(t)?.isBehind ?? false), orElse: () => cfg.targets.first);
+      final it = SceneLayout.build(world, cfg).item(id)!;
+      seen.add('${it.pos.dx.round() ~/ 20}-${it.pos.dy.round() ~/ 20}');
+    }
+    expect(seen.length, greaterThanOrEqualTo(4), reason: 'positions barely change between levels: $seen');
+
+    // Same level at three difficulties -> different looks.
+    final base = repo.byId(first + 3)!;
+    final looks = <String>{};
+    for (final d in Difficulty.values) {
+      final l = SceneLayout.build(world, gen.withDifficulty(world, base, d)).look;
+      looks.add('${l.hue.round()}|${l.mirror}|${l.floorIndex}|${l.tint.value}');
+    }
+    expect(looks.length, 3);
+  });
+
+  test('loose objects avoid furniture and stay on screen', () {
+    var loose = 0;
+    var bad = 0;
+    final notes = <String>[];
+    for (var id = 2; id <= registry.totalLevels; id++) {
+      final base = repo.byId(id)!;
+      final world = registry.byId(base.worldId);
+      for (final d in Difficulty.values) {
+        final cfg = const LevelGenerator().withDifficulty(world, base, d);
+        final lay = SceneLayout.build(world, cfg);
+        for (final it in lay.items) {
+          final inside = it.pos.dx >= 0 && it.pos.dx <= 600 && it.pos.dy >= 0 && it.pos.dy <= 760;
+          if (!inside) {
+            bad++;
+            notes.add('level $id ${d.name}: ${it.id} off screen');
+          }
+          if (it.def.hiddenIn != null || it.def.isBehind) continue;
+          loose++;
+          for (final p in lay.props) {
+            if (p.room == it.room && p.rect.contains(it.pos)) {
+              bad++;
+              notes.add('level $id ${d.name}: ${it.id} sits on ${p.id}');
+              break;
+            }
+          }
+        }
+      }
+    }
+    expect(bad <= loose * 0.03, isTrue, reason: '$bad problems of $loose objects:\n${notes.take(20).join('\n')}');
+  });
+
+  test('unlocking worlds by video costs one video per skipped world', () {
+    final p = Progression(registry);
+    final d = PlayerData();
+    expect(p.lockedUpTo(registry.worlds[1], d).length, 1);
+    expect(p.lockedUpTo(registry.worlds[3], d).length, 3);
+    d.unlockedWorlds.add(registry.worlds[1].id);
+    expect(p.lockedUpTo(registry.worlds[3], d).length, 2);
+    expect(p.lockedUpTo(registry.worlds[0], d).length, 0);
   });
 
   test('level 1 is the tutorial', () {

@@ -76,6 +76,14 @@ class Progression {
   bool isWorldUnlocked(WorldDef w, PlayerData d) =>
       d.unlockedWorlds.contains(w.id) || meetsRequirements(w, d);
 
+  /// Locked worlds from the first one still closed up to and including
+  /// [target], in order. Its length is the number of videos needed to unlock
+  /// [target] by ads: one video per world that gets skipped.
+  List<WorldDef> lockedUpTo(WorldDef target, PlayerData d) => [
+        for (final w in registry.worlds)
+          if (w.index <= target.index && !isWorldUnlocked(w, d)) w,
+      ];
+
   /// Human readable list of what is still missing.
   List<String> missingRequirements(WorldDef w, PlayerData d) {
     final out = <String>[];

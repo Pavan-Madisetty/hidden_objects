@@ -3,23 +3,45 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../../core/utils.dart';
+import '../../engine/scene_layout.dart' show SceneLook;
 import '../../models/world_def.dart';
 
 /// Paints the storybook backdrop of a world: wall/sky, floor/ground and soft
 /// decoration. Objects and props are widgets on top of this.
 /// [variant] 1 draws the mirrored second room of multi-room levels.
 class SceneBackdropPainter extends CustomPainter {
-  SceneBackdropPainter(this.theme, this.variant);
+  SceneBackdropPainter(WorldTheme base, this.variant, {this.look = SceneLook.plain})
+      : theme = _varied(base, look);
 
   final WorldTheme theme;
   final int variant;
+  final SceneLook look;
+
+  static Color _hue(Color c, double deg) {
+    if (deg == 0) return c;
+    final hsl = HSLColor.fromColor(c);
+    return hsl.withHue(((hsl.hue + deg) % 360 + 360) % 360).toColor();
+  }
+
+  static WorldTheme _varied(WorldTheme t, SceneLook l) {
+    if (identical(l, SceneLook.plain)) return t;
+    return WorldTheme(
+      style: t.style,
+      skyTop: _hue(t.skyTop, l.hue),
+      skyBottom: _hue(t.skyBottom, l.hue),
+      groundA: _hue(t.groundA, l.hue * 0.6),
+      groundB: _hue(t.groundB, l.hue * 0.6),
+      accent: _hue(t.accent, l.hue * 1.3),
+      floor: l.floorIndex < 0 ? t.floor : FloorPattern.values[l.floorIndex % FloorPattern.values.length],
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
     canvas.save();
-    if (variant == 1) {
+    if ((variant == 1) != look.mirror) {
       canvas.translate(w, 0);
       canvas.scale(-1, 1);
     }
@@ -41,15 +63,19 @@ class SceneBackdropPainter extends CustomPainter {
         break;
     }
     canvas.restore();
-    // soft vignette for depth
     final rect = Offset.zero & size;
+    // time-of-day tint: bright (easy), golden (medium), dusk (hard)
+    if (look.tintAlpha > 0) {
+      canvas.drawRect(rect, Paint()..color = alpha(look.tint, look.tintAlpha));
+    }
+    // soft vignette for depth
     canvas.drawRect(
       rect,
       Paint()
         ..shader = RadialGradient(
           center: Alignment.center,
           radius: 0.95,
-          colors: [const Color(0x00000000), alpha(Colors.black, 0.13)],
+          colors: [const Color(0x00000000), alpha(Colors.black, look.vignette)],
           stops: const [0.72, 1.0],
         ).createShader(rect),
     );
@@ -130,7 +156,7 @@ class SceneBackdropPainter extends CustomPainter {
   }
 
   void _rug(Canvas c, double w, double h) {
-    final center = Offset(w * 0.5, h * 0.73);
+    final center = Offset(w * (0.36 + look.b * 0.28), h * (0.70 + look.a * 0.06));
     c.drawOval(Rect.fromCenter(center: center, width: 380, height: 120), _fill(alpha(theme.accent, 0.22)));
     c.drawOval(
       Rect.fromCenter(center: center, width: 320, height: 92),
@@ -164,14 +190,26 @@ class SceneBackdropPainter extends CustomPainter {
     final horizon = h * 0.55;
     final wall = Rect.fromLTWH(0, 0, w, horizon);
     c.drawRect(wall, _grad(wall, _skyTop, _skyBottom));
-    // wallpaper dots
+    // wallpaper: dots, stripes or stars (varies per level)
     final dot = _fill(alpha(Colors.white, 0.2));
-    var row = 0;
-    for (var y = 18.0; y < horizon - 18; y += 38) {
-      for (var x = (row % 2) * 24.0 + 12; x < w; x += 48) {
-        c.drawCircle(Offset(x, y), 4, dot);
+    final pat = look.seed % 3;
+    if (pat == 1) {
+      for (var x = 0.0; x < w; x += 60) {
+        c.drawRect(Rect.fromLTWH(x, 0, 28, horizon), _fill(alpha(Colors.white, 0.10)));
       }
-      row++;
+    } else {
+      var row = 0;
+      for (var y = 18.0; y < horizon - 18; y += 38) {
+        for (var x = (row % 2) * 24.0 + 12; x < w; x += 48) {
+          if (pat == 2) {
+            c.drawCircle(Offset(x, y), 2.6, dot);
+            c.drawCircle(Offset(x + 8, y + 6), 1.6, dot);
+          } else {
+            c.drawCircle(Offset(x, y), 4, dot);
+          }
+        }
+        row++;
+      }
     }
     // bunting
     final bunt = [theme.accent, const Color(0xFFFFD166), const Color(0xFF6EC6FF), const Color(0xFF8BE36B)];
@@ -189,7 +227,9 @@ class SceneBackdropPainter extends CustomPainter {
       c.drawPath(p, _fill(alpha(bunt[i % bunt.length], 0.75)));
     }
     // window (slot A)
-    _window(c, Rect.fromLTRB(w * 0.09, h * 0.105, w * 0.35, h * 0.30));
+    final wx = 0.06 + look.a * 0.5; // window slides along the wall
+    final ww = 0.22 + look.b * 0.08;
+    _window(c, Rect.fromLTRB(w * wx, h * 0.105, w * (wx + ww), h * (0.27 + look.b * 0.04)));
     // baseboard
     c.drawRect(Rect.fromLTWH(0, horizon - 12, w, 16), _fill(darken(_skyBottom, 0.1)));
     _floor(c, w, h, horizon + 4);
@@ -213,10 +253,10 @@ class SceneBackdropPainter extends CustomPainter {
     final horizon = h * 0.5;
     final sky = Rect.fromLTWH(0, 0, w, horizon + 20);
     c.drawRect(sky, _grad(sky, _skyTop, _skyBottom));
-    _sun(c, w * 0.85, h * 0.085, 34);
-    _cloud(c, w * 0.12, h * 0.07, 1.0);
-    _cloud(c, w * 0.52, h * 0.16, 0.8, a: 0.85);
-    _cloud(c, w * 0.72, h * 0.31, 0.9, a: 0.8);
+    _sun(c, w * (0.15 + look.a * 0.7), h * 0.085, 34);
+    _cloud(c, w * (0.05 + look.b * 0.3), h * 0.07, 1.0);
+    _cloud(c, w * (0.3 + look.a * 0.3), h * 0.16, 0.8, a: 0.85);
+    _cloud(c, w * (0.5 + look.b * 0.3), h * 0.31, 0.9, a: 0.8);
     _hills(c, w, horizon - 6, mix(theme.groundA, _skyBottom, 0.55), 46, 0.5);
     _hills(c, w, horizon + 12, mix(theme.groundA, _skyBottom, 0.3), 34, 2.4);
     final ground = Rect.fromLTWH(0, horizon + 18, w, h - horizon - 18);
@@ -226,7 +266,7 @@ class SceneBackdropPainter extends CustomPainter {
       c.drawRect(Rect.fromLTWH(0, y, w, 26), _fill(alpha(Colors.white, 0.06)));
     }
     // flowers
-    final rnd = Random(4);
+    final rnd = Random(4 + look.seed % 1000);
     const cols = [Color(0xFFFFFFFF), Color(0xFFFFB3D9), Color(0xFFFFE066), Color(0xFFB39DFF)];
     for (var i = 0; i < 46; i++) {
       final x = rnd.nextDouble() * w;
@@ -392,5 +432,5 @@ class SceneBackdropPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant SceneBackdropPainter old) =>
-      old.theme != theme || old.variant != variant;
+      old.variant != variant || !identical(old.look, look) || old.theme.style != theme.style;
 }

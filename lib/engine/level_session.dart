@@ -53,7 +53,7 @@ class HintResult {
 /// Pure game-state for one play of a level. No widgets in here, so it is easy
 /// to unit-test and to reuse for any level configuration.
 class LevelSession extends ChangeNotifier {
-  LevelSession(this.cfg, this.world) : layout = SceneLayout.build(world, cfg);
+  LevelSession(this.cfg, this.world, {int salt = 0}) : layout = SceneLayout.build(world, cfg, salt: salt);
 
   final LevelConfig cfg;
   final WorldDef world;
