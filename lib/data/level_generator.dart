@@ -261,7 +261,7 @@ class LevelGenerator {
     int rewardMultiplier = 1,
     bool forceTimed = false,
   }) {
-    final rng = Rng(seed ?? levelId * 7919 + 13);
+    final rng = Rng(seed ?? levelId * 7919 + 13 + diff.index * 104729);
     final chain = world.supportsChains ? m.chain : 0;
 
     bool kindOn(String propId) {
@@ -322,7 +322,7 @@ class LevelGenerator {
 
     // ---- loose objects in plain sight ----
     final freeCands = rng.shuffled(
-      world.items.where((i) => i.isFree && !targets.contains(i.id)).map((i) => i.id),
+      world.loosePool.where((i) => !targets.contains(i.id)).map((i) => i.id),
     );
     final pickedFree = freeCands.take(remaining).toList();
     targets.addAll(pickedFree);
@@ -338,9 +338,8 @@ class LevelGenerator {
 
     // ---- decoys ----
     final decoyPool = <String>[
-      ...world.items
-          .where((i) => (i.isFree || (i.isBehind && backAllowed)) && !targets.contains(i.id))
-          .map((i) => i.id),
+      ...world.loosePool.where((i) => !targets.contains(i.id)).map((i) => i.id),
+      if (backAllowed) ...world.items.where((i) => i.isBehind && !targets.contains(i.id)).map((i) => i.id),
     ];
     final decoys = <String>[];
 
@@ -391,12 +390,10 @@ class LevelGenerator {
     final bonus = <String>[];
     if (m.bonus > 0) {
       final bonusPool = rng.shuffled(
-        world.items
-            .where((i) =>
-                (i.isFree || i.isBehind && backAllowed) &&
-                !targets.contains(i.id) &&
-                !decoys.contains(i.id))
-            .map((i) => i.id),
+        [
+          ...world.loosePool.map((i) => i.id),
+          if (backAllowed) ...world.items.where((i) => i.isBehind).map((i) => i.id),
+        ].where((id) => !targets.contains(id) && !decoys.contains(id)),
       );
       for (final b in bonusPool.take(m.bonus)) {
         bonus.add(b);

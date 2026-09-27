@@ -230,6 +230,25 @@ class SceneBackdropPainter extends CustomPainter {
     final wx = 0.06 + look.a * 0.5; // window slides along the wall
     final ww = 0.22 + look.b * 0.08;
     _window(c, Rect.fromLTRB(w * wx, h * 0.105, w * (wx + ww), h * (0.27 + look.b * 0.04)));
+    // wall shelves (objects sit on these)
+    for (final sh in look.shelves) {
+      final x0 = w * sh.x0;
+      final x1 = w * sh.x1;
+      final y = h * sh.y;
+      final wood = _fill(darken(theme.groundB, 0.25));
+      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTRB(x0, y, x1, y + 14), const Radius.circular(5)), wood);
+      c.drawRect(Rect.fromLTRB(x0, y + 14, x1, y + 18), _fill(alpha(Colors.black, 0.18)));
+      for (final bx in [x0 + 28, x1 - 44]) {
+        c.drawPath(
+          Path()
+            ..moveTo(bx, y + 14)
+            ..lineTo(bx + 16, y + 14)
+            ..lineTo(bx, y + 46)
+            ..close(),
+          wood,
+        );
+      }
+    }
     // baseboard
     c.drawRect(Rect.fromLTWH(0, horizon - 12, w, 16), _fill(darken(_skyBottom, 0.1)));
     _floor(c, w, h, horizon + 4);

@@ -237,6 +237,32 @@ class SceneViewState extends State<SceneView> with SingleTickerProviderStateMixi
       ));
     }
 
+    final clutter = <Widget>[
+      for (final cl in layout.clutter)
+        if (cl.room == room)
+          Positioned(
+            left: cl.pos.dx - cl.size / 2,
+            top: cl.pos.dy - cl.size / 2,
+            width: cl.size,
+            height: cl.size,
+            child: IgnorePointer(
+              child: Transform.rotate(
+                angle: cl.angle,
+                child: Center(
+                  child: Text(
+                    cl.emoji,
+                    style: TextStyle(
+                      fontSize: cl.size * 0.8,
+                      decoration: TextDecoration.none,
+                      shadows: [Shadow(color: alpha(Colors.black, 0.25), blurRadius: 4, offset: const Offset(0, 3))],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+    ];
+
     final hint = widget.hint;
     final hand = widget.handAt;
 
@@ -254,6 +280,7 @@ class SceneViewState extends State<SceneView> with SingleTickerProviderStateMixi
                 child: CustomPaint(painter: SceneBackdropPainter(widget.theme, room, look: layout.look)),
               ),
             ),
+            RepaintBoundary(child: Stack(clipBehavior: Clip.none, children: clutter)),
             ...behindItems,
             ...props,
             ...frontItems,

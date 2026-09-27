@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../data/item_library.dart';
+
 /// Logical size of every scene, in "scene units". Scenes are portrait-ish so
 /// they fit a phone; larger scenes are explored with zoom + pan.
 const double kSceneW = 600;
@@ -175,6 +177,9 @@ class ItemDef {
   bool get isHidden => hiddenIn != null;
   bool get isFree => cell != null && cell!.startsWith('f');
 
+  /// Sits out in the open (not inside or behind furniture).
+  bool get isLoose => hiddenIn == null && !isBehind;
+
   Offset get normPos => isBehind ? Cells.behind[cell]! : (Cells.free[cell] ?? const Offset(0.5, 0.5));
 }
 
@@ -229,8 +234,19 @@ class WorldDef {
     for (final i in items) {
       if (i.id == id) return i;
     }
-    return null;
+    return ItemLibrary.byId(id);
   }
+
+  /// Everything that can lie out in the open in this world: the hand-placed
+  /// objects plus the themed library (one entry per emoji).
+  late final List<ItemDef> loosePool = () {
+    final seen = <String>{for (final i in items) i.emoji};
+    final out = <ItemDef>[for (final i in items) if (i.isFree) i];
+    for (final i in ItemLibrary.forWorld(id)) {
+      if (seen.add(i.emoji)) out.add(i);
+    }
+    return out;
+  }();
 
   bool get supportsChains =>
       propById(lockedProp) != null &&

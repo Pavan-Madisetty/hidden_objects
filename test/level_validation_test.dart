@@ -31,7 +31,7 @@ void main() {
       }
       final c = cfg;
       final world = registry.byId(c.worldId);
-      final byItem = {for (final i in world.items) i.id: i};
+      final byItem = _Lookup(world);
       final propIds = {for (final p in world.props) p.id};
 
       final n = c.targets.length;
@@ -101,7 +101,7 @@ void main() {
     for (var id = 1; id <= registry.totalLevels; id++) {
       final base = repo.byId(id)!;
       final world = registry.byId(base.worldId);
-      final byItem = {for (final i in world.items) i.id: i};
+      final byItem = _Lookup(world);
       for (final d in Difficulty.values) {
         final c = gen.withDifficulty(world, base, d);
         final tag = 'level $id as ${d.name}';
@@ -186,6 +186,24 @@ void main() {
     expect(bad <= loose * 0.03, isTrue, reason: '$bad problems of $loose objects:\n${notes.take(20).join('\n')}');
   });
 
+  test('clutter never duplicates something you must find, and objects change per level', () {
+    final problems = <String>[];
+    final firstTargets = <String>{};
+    for (var id = 2; id <= registry.totalLevels; id++) {
+      final cfg = repo.byId(id)!;
+      final world = registry.byId(cfg.worldId);
+      final lay = SceneLayout.build(world, cfg);
+      final emojis = {for (final i in lay.items) i.def.emoji};
+      for (final c in lay.clutter) {
+        if (emojis.contains(c.emoji)) problems.add('level $id: clutter ${c.emoji} duplicates an object to find');
+      }
+      if (lay.clutter.length < 10) problems.add('level $id: only ${lay.clutter.length} clutter objects');
+      firstTargets.add(cfg.targets.take(3).join('+'));
+    }
+    expect(problems, isEmpty, reason: problems.take(20).join('\n'));
+    expect(firstTargets.length, greaterThan(60), reason: 'levels reuse the same objects too often');
+  });
+
   test('unlocking worlds by video costs one video per skipped world', () {
     final p = Progression(registry);
     final d = PlayerData();
@@ -235,4 +253,12 @@ void main() {
     expect(r.xp, 456);
     expect(r.stars[5], 2);
   });
+}
+
+/// byItem[id] lookup that also finds library objects.
+class _Lookup {
+  _Lookup(this.world);
+  final WorldDef world;
+  ItemDef? operator [](String id) => world.itemById(id);
+  bool containsKey(String id) => world.itemById(id) != null;
 }

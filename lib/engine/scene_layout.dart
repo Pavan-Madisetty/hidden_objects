@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 
+import '../data/item_library.dart';
 import '../models/level_config.dart';
 import '../models/world_def.dart';
 import '../core/utils.dart';
@@ -52,6 +53,25 @@ class PlacedItem {
   String? get hiddenIn => def.hiddenIn;
 }
 
+/// A wall shelf (normalised, before mirroring) that objects can sit on.
+class Shelf {
+  const Shelf(this.y, this.x0, this.x1);
+  final double y;
+  final double x0;
+  final double x1;
+}
+
+/// Decorative clutter: makes the scene busy like a real "I spy" picture.
+/// Never tappable and never the same picture as something you must find.
+class PlacedClutter {
+  const PlacedClutter({required this.emoji, required this.pos, required this.size, required this.angle, required this.room});
+  final String emoji;
+  final Offset pos;
+  final double size;
+  final double angle;
+  final int room;
+}
+
 /// Per-level visual variation: mirrored scene, colour shift, floor pattern,
 /// time-of-day tint. Derived from the level + difficulty (+ optional salt) so
 /// every level - and every difficulty of the same level - looks different.
@@ -66,6 +86,7 @@ class SceneLook {
     required this.vignette,
     required this.a,
     required this.b,
+    this.shelves = const [],
   });
 
   final int seed;
@@ -81,6 +102,9 @@ class SceneLook {
   /// Free random numbers (0..1) for decoration placement.
   final double a;
   final double b;
+
+  /// Wall shelves (drawn only in indoor worlds).
+  final List<Shelf> shelves;
 
   static const plain = SceneLook(
     seed: 0,
@@ -127,6 +151,10 @@ class SceneLook {
       vignette: vig,
       a: r.nextDouble(),
       b: r.nextDouble(),
+      shelves: [
+        Shelf(0.29 + r.nextDouble() * 0.06, r.chance(0.5) ? 0.02 : 0.30, r.chance(0.5) ? 0.66 : 0.98),
+        Shelf(0.44 + r.nextDouble() * 0.05, r.chance(0.5) ? 0.02 : 0.36, r.chance(0.5) ? 0.62 : 0.98),
+      ],
     );
   }
 }
@@ -137,11 +165,12 @@ class SceneLook {
 /// may be mirrored, and loose objects are scattered with a spacing rule that
 /// depends on the difficulty (Hard = more cluttered, smaller gaps).
 class SceneLayout {
-  SceneLayout._(this.props, this.items, this.look);
+  SceneLayout._(this.props, this.items, this.look, this.clutter);
 
   final List<PlacedProp> props;
   final List<PlacedItem> items;
   final SceneLook look;
+  final List<PlacedClutter> clutter;
 
   /// [salt] makes every attempt different (0 keeps a level reproducible, used
   /// by the tutorial, the daily challenge and tests).
@@ -216,14 +245,15 @@ class SceneLayout {
     }
 
     // ---- items ---------------------------------------------------------------
-    final ids = cfg.sceneItemIds.toSet();
     final placed = <PlacedItem>[];
     final loose = <ItemDef>[];
     final looseRoom = <String, int>{};
+    final indoor = world.theme.style == SceneStyle.room;
 
     // Behind / hidden items follow their furniture.
-    for (final def in world.items) {
-      if (!ids.contains(def.id)) continue;
+    for (final id in cfg.sceneItemIds) {
+      final def = world.itemById(id);
+      if (def == null) continue;
       final r = rooms > 1 ? clampI(cfg.rooms[def.id] ?? 0, 0, rooms - 1) : 0;
       final mul = def.isHidden ? clampD(cfg.sizeMul, 0.85, 1.2) : cfg.sizeMul;
       Offset? norm;
@@ -283,10 +313,21 @@ class SceneLayout {
       ];
       Offset? best;
       var relax = 1.0;
+      final flip = (r == 1) != look.mirror;
       for (var attempt = 0; attempt < 90 && best == null; attempt++) {
         if (attempt > 0 && attempt % 30 == 0) relax *= 0.85;
-        final x = 40 + rad + rng.nextDouble() * (kSceneW - 80 - 2 * rad);
-        final y = kSceneH * 0.07 + rad + rng.nextDouble() * (kSceneH * 0.88 - 2 * rad);
+        double x;
+        double y;
+        if (indoor && attempt < 40 && rng.chance(0.4)) {
+          // sit on a wall shelf
+          final sh = look.shelves[rng.nextInt(look.shelves.length)];
+          final bx = (sh.x0 + rng.nextDouble() * (sh.x1 - sh.x0)) * kSceneW;
+          x = flip ? kSceneW - bx : bx;
+          y = sh.y * kSceneH - rad * 0.85;
+        } else {
+          x = 40 + rad + rng.nextDouble() * (kSceneW - 80 - 2 * rad);
+          y = kSceneH * 0.07 + rad + rng.nextDouble() * (kSceneH * 0.88 - 2 * rad);
+        }
         final c = Offset(x, y);
         var ok = true;
         for (final o in obstacles) {
@@ -318,13 +359,71 @@ class SceneLayout {
         isBonus: cfg.bonus.contains(def.id),
       ));
     }
-    // Keep the original world order (stable widget keys / tray order).
+    // Keep the level's own order (tray order, stable keys).
     final byId = {for (final i in placed) i.id: i};
     final items = <PlacedItem>[
-      for (final d in world.items)
-        if (byId.containsKey(d.id)) byId[d.id]!,
+      for (final id in cfg.sceneItemIds)
+        if (byId.containsKey(id)) byId[id]!,
     ];
-    return SceneLayout._(props, items, look);
+
+    // ---- clutter: a busy, lived-in scene -----------------------------------------
+    final clutterCount = switch (cfg.difficulty) {
+      Difficulty.easy => 14,
+      Difficulty.medium => 28,
+      Difficulty.hard => 44,
+    };
+    final used = <String>{for (final i in items) i.def.emoji};
+    final themed = rng.shuffled(ItemLibrary.forWorld(world.id));
+    final restLib = rng.shuffled(ItemLibrary.all);
+    final pool = <String>[];
+    for (final d in [...themed, ...restLib]) {
+      if (used.add(d.emoji)) pool.add(d.emoji);
+      if (pool.length >= clutterCount * rooms) break;
+    }
+    final clutter = <PlacedClutter>[];
+    var pi = 0;
+    for (var r = 0; r < rooms; r++) {
+      final flip = (r == 1) != look.mirror;
+      final anchors = [
+        for (final it in items)
+          if (it.room == r) it,
+      ];
+      for (var k = 0; k < clutterCount && pi < pool.length; k++) {
+        final size = 54 + rng.nextDouble() * 34;
+        Offset? c;
+        for (var attempt = 0; attempt < 25 && c == null; attempt++) {
+          double x;
+          double y;
+          if (indoor && rng.chance(0.3)) {
+            final sh = look.shelves[rng.nextInt(look.shelves.length)];
+            final bx = (sh.x0 + rng.nextDouble() * (sh.x1 - sh.x0)) * kSceneW;
+            x = flip ? kSceneW - bx : bx;
+            y = sh.y * kSceneH - size * 0.42;
+          } else {
+            x = 30 + rng.nextDouble() * (kSceneW - 60);
+            y = kSceneH * 0.05 + rng.nextDouble() * kSceneH * 0.9;
+          }
+          final cand = Offset(x, y);
+          var ok = true;
+          for (final it in anchors) {
+            if ((it.pos - cand).distance < (it.size + size) * 0.3) {
+              ok = false;
+              break;
+            }
+          }
+          if (ok) c = cand;
+        }
+        if (c == null) continue;
+        clutter.add(PlacedClutter(
+          emoji: pool[pi++],
+          pos: c,
+          size: size,
+          angle: (rng.nextDouble() - 0.5) * 0.9,
+          room: r,
+        ));
+      }
+    }
+    return SceneLayout._(props, items, look, clutter);
   }
 
   PlacedItem? item(String id) {
